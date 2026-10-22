@@ -1,0 +1,42 @@
+name: Atualizar restaurantes de SP
+
+on:
+  workflow_dispatch:          # botão "Run workflow" na aba Actions
+  schedule:
+    - cron: "0 9 1 * *"       # todo dia 1 do mês, às 6h de Brasília
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar ferramentas
+        run: pip install overturemaps duckdb
+
+      - name: Baixar lugares e bairros de São Paulo (Overture Maps)
+        run: |
+          BBOX="-46.83,-24.01,-46.36,-23.35"
+          overturemaps download --bbox="$BBOX" -f geoparquet --type=place -o places.parquet
+          overturemaps download --bbox="$BBOX" -f geoparquet --type=division_area -o divisions.parquet
+
+      - name: Gerar as planilhas
+        run: python gerar_csv.py
+
+      - name: Salvar as planilhas no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          git commit -m "Atualiza restaurantes de SP" || echo "Nada mudou desde a última vez"
+          git push
